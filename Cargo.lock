@@ -32,6 +32,7 @@ version = "0.1.0"
 dependencies = [
  "dioxus",
  "dioxus-motion",
+ "route_transitions",
 ]
 
 [[package]]
@@ -3481,6 +3482,15 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "route_transitions"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
 ]
 
 [[package]]
