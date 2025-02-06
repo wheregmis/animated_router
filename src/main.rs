@@ -73,7 +73,6 @@ pub struct TransitionConfig {
     final_from: Transform,
     initial_to: Transform,
     final_to: Transform,
-    duration: Duration,
 }
 
 #[derive(PartialEq, Clone)]
@@ -93,57 +92,66 @@ impl TransitionVariant {
                 final_from: Transform::new(-100.0, 0.0, 1.0, 1.0),
                 initial_to: Transform::new(100.0, 0.0, 1.0, 1.0),
                 final_to: Transform::identity(),
-                duration: Duration::from_millis(300),
             },
             TransitionVariant::SlideRight => TransitionConfig {
                 initial_from: Transform::identity(),
                 final_from: Transform::new(100.0, 0.0, 1.0, 1.0),
                 initial_to: Transform::new(-100.0, 0.0, 1.0, 1.0),
                 final_to: Transform::identity(),
-                duration: Duration::from_millis(300),
             },
             TransitionVariant::SlideUp => TransitionConfig {
                 initial_from: Transform::identity(),
                 final_from: Transform::new(0.0, -100.0, 1.0, 1.0),
                 initial_to: Transform::new(0.0, 100.0, 1.0, 1.0),
                 final_to: Transform::identity(),
-                duration: Duration::from_millis(300),
             },
             TransitionVariant::SlideDown => TransitionConfig {
                 initial_from: Transform::identity(),
                 final_from: Transform::new(0.0, 100.0, 1.0, 1.0),
                 initial_to: Transform::new(0.0, -100.0, 1.0, 1.0),
                 final_to: Transform::identity(),
-                duration: Duration::from_millis(300),
             },
             TransitionVariant::Fade => TransitionConfig {
                 initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
                 final_from: Transform::new(0.0, 0.0, 1.0, 0.0),
                 initial_to: Transform::new(0.0, 0.0, 1.0, 0.0),
                 final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
-                duration: Duration::from_millis(300),
             },
         }
     }
 }
-
 #[component]
 fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
     let mut animated_router = use_animated_router::<Route>();
     let config = transition.get_config();
     let mut from_transform = use_motion(config.initial_from);
     let mut to_transform = use_motion(config.initial_to);
+    let mut from_opacity = use_motion(1.0f32);
+    let mut to_opacity = use_motion(0.0f32);
 
     use_effect(move || {
+        let spring = Spring {
+            stiffness: 160.0, // Reduced from 180.0 for less aggressive movement
+            damping: 20.0,    // Increased from 12.0 for faster settling
+            mass: 1.5,        // Slightly increased for more "weight"
+            velocity: 10.0,   // Keep at 0 for predictable start
+        };
+
+        // Animate FROM route
         from_transform.animate_to(
             config.final_from,
-            AnimationConfig::new(AnimationMode::Tween(Tween::new(config.duration))),
+            AnimationConfig::new(AnimationMode::Spring(spring)),
         );
 
+        // Animate TO route
         to_transform.animate_to(
             config.final_to,
-            AnimationConfig::new(AnimationMode::Tween(Tween::new(config.duration))),
+            AnimationConfig::new(AnimationMode::Spring(spring)),
         );
+
+        // Fade out old route
+        from_opacity.animate_to(0.0, AnimationConfig::new(AnimationMode::Spring(spring)));
+        to_opacity.animate_to(1.0, AnimationConfig::new(AnimationMode::Spring(spring)));
     });
 
     use_effect(move || {
@@ -164,36 +172,37 @@ fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
                 -webkit-transform-style: preserve-3d;
                 -webkit-tap-highlight-color: transparent;
             ",
-            // FROM route
             div {
                 class: "route-content from",
                 style: "
-               
+                    position: absolute;
+                    top: 0;
+                    left: 0;
                     width: 100%;
                     height: 100%;
-                    transform: translate3d({from_transform.get_value().x}%, {from_transform.get_value().y}%, 0);
-                    -webkit-transform: translate3d({from_transform.get_value().x}%, {from_transform.get_value().y}%, 0);
-                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    transform: translate3d({from_transform.get_value().x}%, {from_transform.get_value().y}%, 0) 
+                             scale({from_transform.get_value().scale});
+                    opacity: {from_opacity.get_value()};
+                    will-change: transform, opacity;
                     backface-visibility: hidden;
                     -webkit-backface-visibility: hidden;
-                    will-change: transform;
                 ",
                 {from}
             }
-
-            // TO route
             div {
                 class: "route-content to",
                 style: "
-              
+                    position: absolute;
+                    top: 0;
+                    left: 0;
                     width: 100%;
                     height: 100%;
-                    transform: translate3d({to_transform.get_value().x}%, {to_transform.get_value().y}%, 0);
-                    -webkit-transform: translate3d({to_transform.get_value().x}%, {to_transform.get_value().y}%, 0);
-                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    transform: translate3d({to_transform.get_value().x}%, {to_transform.get_value().y}%, 0) 
+                             scale({to_transform.get_value().scale});
+                    opacity: {to_opacity.get_value()};
+                    will-change: transform, opacity;
                     backface-visibility: hidden;
                     -webkit-backface-visibility: hidden;
-                    will-change: transform;
                 ",
                 Outlet::<Route> {}
             }
@@ -237,7 +246,7 @@ fn AnimatedOutlet(children: Element) -> Element {
 #[derive(Routable, Clone, Debug, PartialEq)]
 #[rustfmt::skip]
 enum Route {
-    #[layout(NavBar)]
+    #[layout(AnimationBuilder)]
         #[route("/")]
         Home {},
         #[route("/slide-left")]
@@ -269,18 +278,9 @@ impl Route {
 }
 
 #[component]
-fn NavBar() -> Element {
+fn AnimationBuilder() -> Element {
     rsx! {
-        AnimatedRouter::<Route> {
-            nav { class: "fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-200 px-4 py-3",
-                div { class: "max-w-7xl mx-auto flex items-center justify-between",
-                    span { class: "text-lg font-semibold text-gray-800",
-                        "Dioxus Motion Page Transitions"
-                    }
-                }
-            }
-            AnimatedOutlet {}
-        }
+        AnimatedRouter::<Route> { AnimatedOutlet {} }
     }
 }
 
