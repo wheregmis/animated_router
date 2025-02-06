@@ -50,33 +50,22 @@ pub fn derive_route_transitions(input: TokenStream) -> TokenStream {
         let variant_ident = &variant.ident;
         let component_name = &variant.ident;
 
-        if variant_ident == "PageNotFound" {
-            let pattern = match &variant.fields {
-                Fields::Named(named_fields) => {
-                    let field_patterns = named_fields.named.iter().map(|f| {
-                        let field_name = &f.ident;
-                        quote! { #field_name }
-                    });
-                    quote! { Self::#variant_ident { #(#field_patterns,)* } }
+        match &variant.fields {
+            Fields::Named(_) => {
+                // For any variant with named fields, just return Home component
+                quote! {
+                    Self::#variant_ident { .. } => Home()
                 }
-                _ => panic!("PageNotFound must have named fields"),
-            };
-
-            quote! {
-                #pattern => (|| {
-                    let props = PageNotFoundProps { route: route.clone() };
-                    PageNotFound(props)
-                })()
             }
-        } else {
-            let pattern = match &variant.fields {
-                Fields::Named(_) => quote! { Self::#variant_ident { .. } },
-                Fields::Unnamed(_) => quote! { Self::#variant_ident(..) },
-                Fields::Unit => quote! { Self::#variant_ident },
-            };
-
-            quote! {
-                #pattern => #component_name()
+            Fields::Unnamed(_) => {
+                quote! {
+                    Self::#variant_ident(..) => #component_name()
+                }
+            }
+            Fields::Unit => {
+                quote! {
+                    Self::#variant_ident => #component_name()
+                }
             }
         }
     });
