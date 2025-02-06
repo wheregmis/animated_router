@@ -9,8 +9,9 @@ edition = "2021"
 [dependencies]
 dioxus = { version = "0.6.0", features = ["router"] }
 dioxus-motion = { version = "0.2.3", default-features = false, features = [
-    "desktop",
+    "web",
 ] }
+router_derive = { path = "./router_derive" }
 
 [features]
 default = ["desktop"]
@@ -29,3 +30,6 @@ inherits = "dev"
 
 [profile.android-dev]
 inherits = "dev"
+
+[workspace]
+members = [".", "router_derive"]
