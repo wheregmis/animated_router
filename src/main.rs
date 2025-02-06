@@ -59,14 +59,21 @@ pub fn AnimatedRouter<R: Routable + PartialEq + Clone>(
         prev_route.write().set_target_route(route);
     }
 
-    rsx!(
-        {children}
-    )
+    rsx!({ children })
 }
 
 /// Shortcut to get access to the [AnimatedRouterContext].
 pub fn use_animated_router<Route: Routable + PartialEq>() -> Signal<AnimatedRouterContext<Route>> {
     use_context()
+}
+
+#[derive(Clone)]
+pub struct TransitionConfig {
+    initial_from: Transform,
+    final_from: Transform,
+    initial_to: Transform,
+    final_to: Transform,
+    duration: Duration,
 }
 
 #[derive(PartialEq, Clone)]
@@ -76,77 +83,120 @@ pub enum TransitionVariant {
     SlideUp,
     SlideDown,
     Fade,
-    Scale,
-    Custom(Transform),
 }
 
 impl TransitionVariant {
-    fn get_transform(&self) -> Transform {
+    fn get_config(&self) -> TransitionConfig {
         match self {
-            TransitionVariant::SlideLeft => Transform::new(-100.0, 0.0, 1.0, 0.0),
-            TransitionVariant::SlideRight => Transform::new(100.0, 0.0, 1.0, 0.0),
-            TransitionVariant::SlideUp => Transform::new(0.0, -100.0, 1.0, 0.0),
-            TransitionVariant::SlideDown => Transform::new(0.0, 100.0, 1.0, 0.0),
-            TransitionVariant::Fade => Transform::new(0.0, 0.0, 0.0, 0.0),
-            TransitionVariant::Scale => Transform::new(0.0, 0.0, 0.5, 0.0),
-            TransitionVariant::Custom(transform) => *transform,
+            TransitionVariant::SlideLeft => TransitionConfig {
+                initial_from: Transform::identity(),
+                final_from: Transform::new(-100.0, 0.0, 1.0, 1.0),
+                initial_to: Transform::new(100.0, 0.0, 1.0, 1.0),
+                final_to: Transform::identity(),
+                duration: Duration::from_millis(300),
+            },
+            TransitionVariant::SlideRight => TransitionConfig {
+                initial_from: Transform::identity(),
+                final_from: Transform::new(100.0, 0.0, 1.0, 1.0),
+                initial_to: Transform::new(-100.0, 0.0, 1.0, 1.0),
+                final_to: Transform::identity(),
+                duration: Duration::from_millis(300),
+            },
+            TransitionVariant::SlideUp => TransitionConfig {
+                initial_from: Transform::identity(),
+                final_from: Transform::new(0.0, -100.0, 1.0, 1.0),
+                initial_to: Transform::new(0.0, 100.0, 1.0, 1.0),
+                final_to: Transform::identity(),
+                duration: Duration::from_millis(300),
+            },
+            TransitionVariant::SlideDown => TransitionConfig {
+                initial_from: Transform::identity(),
+                final_from: Transform::new(0.0, 100.0, 1.0, 1.0),
+                initial_to: Transform::new(0.0, -100.0, 1.0, 1.0),
+                final_to: Transform::identity(),
+                duration: Duration::from_millis(300),
+            },
+            TransitionVariant::Fade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.0, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+                duration: Duration::from_millis(300),
+            },
         }
     }
 }
+
 #[component]
 fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
     let mut animated_router = use_animated_router::<Route>();
-    let mut transform = use_motion(Transform::new(0.0, 0.0, 1.0, 1.0));
-    let mut opacity = use_motion(1.0f32);
+    let config = transition.get_config();
+    let mut from_transform = use_motion(config.initial_from);
+    let mut to_transform = use_motion(config.initial_to);
 
-    // Initial transform setup
     use_effect(move || {
-        // First set initial position
-        transform.reset();
-        opacity.reset();
+        from_transform.animate_to(
+            config.final_from,
+            AnimationConfig::new(AnimationMode::Tween(Tween::new(config.duration))),
+        );
 
-        // Then animate to final position
-        let target_transform = match transition {
-            TransitionVariant::SlideLeft => Transform::new(-100.0, 0.0, 1.0, 0.0),
-            TransitionVariant::SlideRight => Transform::new(100.0, 0.0, 1.0, 0.0),
-            TransitionVariant::SlideUp => Transform::new(0.0, -100.0, 1.0, 0.0),
-            TransitionVariant::SlideDown => Transform::new(0.0, 100.0, 1.0, 0.0),
-            _ => transition.get_transform(),
-        };
-
-        let config = AnimationConfig::new(AnimationMode::Tween(
-            Tween::new(Duration::from_millis(500)).with_easing(|t, b, c, d| {
-                // Cubic ease-in-out
-                let t = t / (d / 2.0);
-                if t < 1.0 {
-                    c / 2.0 * t * t * t + b
-                } else {
-                    let t = t - 2.0;
-                    c / 2.0 * (t * t * t + 2.0) + b
-                }
-            }),
-        ));
-
-        transform.animate_to(target_transform, config.clone());
-        opacity.animate_to(0.0, config);
+        to_transform.animate_to(
+            config.final_to,
+            AnimationConfig::new(AnimationMode::Tween(Tween::new(config.duration))),
+        );
     });
 
     use_effect(move || {
-        if !transform.is_running() && !opacity.is_running() {
+        if !from_transform.is_running() && !to_transform.is_running() {
             animated_router.write().settle();
         }
     });
 
     rsx! {
         div {
-            class: "",
+            class: "route-container",
             style: "
-                   transform: translate({transform.get_value().x}%, {transform.get_value().y}%) 
-                   scale({transform.get_value().scale});
-                   opacity: {opacity.get_value()};
-                   ",
-            {from}
-            Outlet::<Route> {}
+                position: relative; 
+                width: 100%; 
+                height: 100vh; 
+                overflow: hidden;
+                transform-style: preserve-3d;
+                -webkit-transform-style: preserve-3d;
+                -webkit-tap-highlight-color: transparent;
+            ",
+            // FROM route
+            div {
+                class: "route-content from",
+                style: "
+               
+                    width: 100%;
+                    height: 100%;
+                    transform: translate3d({from_transform.get_value().x}%, {from_transform.get_value().y}%, 0);
+                    -webkit-transform: translate3d({from_transform.get_value().x}%, {from_transform.get_value().y}%, 0);
+                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    backface-visibility: hidden;
+                    -webkit-backface-visibility: hidden;
+                    will-change: transform;
+                ",
+                {from}
+            }
+
+            // TO route
+            div {
+                class: "route-content to",
+                style: "
+              
+                    width: 100%;
+                    height: 100%;
+                    transform: translate3d({to_transform.get_value().x}%, {to_transform.get_value().y}%, 0);
+                    -webkit-transform: translate3d({to_transform.get_value().x}%, {to_transform.get_value().y}%, 0);
+                    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+                    backface-visibility: hidden;
+                    -webkit-backface-visibility: hidden;
+                    will-change: transform;
+                ",
+                Outlet::<Route> {}
+            }
         }
     }
 }
@@ -155,69 +205,23 @@ fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
 fn AnimatedOutlet(children: Element) -> Element {
     let animated_router = use_context::<Signal<AnimatedRouterContext<Route>>>();
 
-    let from_route = match animated_router() {
-        AnimatedRouterContext::FromTo(Route::Home {}, Route::SlideLeft {}) => {
-            Some((rsx!(
-                Home {}
-            ), TransitionVariant::SlideLeft))
-        }
-        AnimatedRouterContext::FromTo(Route::SlideLeft {}, Route::Home {}) => {
-            Some((rsx!(
-                SlideLeft {}
-            ), TransitionVariant::SlideRight))
-        }
-        AnimatedRouterContext::FromTo(Route::Home {}, Route::SlideRight {}) => {
-            Some((rsx!(
-                Home {}
-            ), TransitionVariant::SlideRight))
-        }
-        AnimatedRouterContext::FromTo(Route::SlideRight {}, Route::Home {}) => {
-            Some((rsx!(
-                SlideRight {}
-            ), TransitionVariant::SlideLeft))
-        }
-        AnimatedRouterContext::FromTo(Route::Home {}, Route::SlideUp {}) => {
-            Some((rsx!(
-                Home {}
-            ), TransitionVariant::SlideUp))
-        }
-        AnimatedRouterContext::FromTo(Route::SlideUp {}, Route::Home {}) => {
-            Some((rsx!(
-                SlideUp {}
-            ), TransitionVariant::SlideDown))
-        }
-        AnimatedRouterContext::FromTo(Route::Home {}, Route::SlideDown {}) => {
-            Some((rsx!(
-                Home {}
-            ), TransitionVariant::SlideDown))
-        }
-        AnimatedRouterContext::FromTo(Route::SlideDown {}, Route::Home {}) => {
-            Some((rsx!(
-                SlideDown {}
-            ), TransitionVariant::SlideUp))
-        }
-        AnimatedRouterContext::FromTo(Route::Home {}, Route::Fade {}) => {
-            Some((rsx!(
-                Home {}
-            ), TransitionVariant::Fade))
-        }
-        AnimatedRouterContext::FromTo(Route::Fade {}, Route::Home {}) => {
-            Some((rsx!(
-                Fade {}
-            ), TransitionVariant::Fade))
-        }
-        AnimatedRouterContext::FromTo(Route::Home {}, Route::Scale {}) => {
-            Some((rsx!(
-                Home {}
-            ), TransitionVariant::Scale))
-        }
-        AnimatedRouterContext::FromTo(Route::Scale {}, Route::Home {}) => {
-            Some((rsx!(
-                Scale {}
-            ), TransitionVariant::Scale))
-        }
-        _ => None,
-    };
+    let from_route: Option<(Result<VNode, RenderError>, TransitionVariant)> =
+        match animated_router() {
+            AnimatedRouterContext::FromTo(from, to) => {
+                // Generate component based on route type
+                let component = match from {
+                    Route::Home {} => Home,
+                    Route::SlideLeft {} => SlideLeft,
+                    Route::SlideRight {} => SlideRight,
+                    Route::SlideUp {} => SlideUp,
+                    Route::SlideDown {} => SlideDown,
+                    Route::Fade {} => Fade,
+                    _ => Home,
+                };
+                Some((component(), to.transition_variant()))
+            }
+            _ => None,
+        };
 
     rsx! {
         div {
@@ -235,7 +239,6 @@ fn AnimatedOutlet(children: Element) -> Element {
 enum Route {
     #[layout(NavBar)]
         #[route("/")]
-       
         Home {},
         #[route("/slide-left")]
         SlideLeft {},
@@ -247,13 +250,22 @@ enum Route {
         SlideDown {},
         #[route("/fade")]
         Fade {},
-        #[route("/scale")]
-        Scale {},
-    
     #[end_layout]
-
     #[route("/:..route")]
     PageNotFound { route: Vec<String> },
+}
+
+impl Route {
+    fn transition_variant(&self) -> TransitionVariant {
+        match self {
+            Route::SlideLeft {} => TransitionVariant::SlideLeft,
+            Route::SlideRight {} => TransitionVariant::SlideRight,
+            Route::SlideUp {} => TransitionVariant::SlideUp,
+            Route::SlideDown {} => TransitionVariant::SlideDown,
+            Route::Fade {} => TransitionVariant::Fade,
+            _ => TransitionVariant::SlideRight,
+        }
+    }
 }
 
 #[component]
@@ -264,15 +276,6 @@ fn NavBar() -> Element {
                 div { class: "max-w-7xl mx-auto flex items-center justify-between",
                     span { class: "text-lg font-semibold text-gray-800",
                         "Dioxus Motion Page Transitions"
-                    }
-                    div { class: "flex gap-4 items-center",
-                        NavLink { to: Route::Home {}, "Home" }
-                        NavLink { to: Route::SlideLeft {}, "Slide L" }
-                        NavLink { to: Route::SlideRight {}, "Slide R" }
-                        NavLink { to: Route::SlideUp {}, "Slide Up" }
-                        NavLink { to: Route::SlideDown {}, "Slide Down" }
-                        NavLink { to: Route::Fade {}, "Fade" }
-                        NavLink { to: Route::Scale {}, "Scale" }
                     }
                 }
             }
@@ -285,7 +288,7 @@ fn NavBar() -> Element {
 fn NavLink(to: Route, children: Element) -> Element {
     let current_route = use_route::<Route>();
     let is_active = current_route == to;
-    
+
     rsx! {
         Link {
             to,
@@ -296,27 +299,20 @@ fn NavLink(to: Route, children: Element) -> Element {
 }
 
 #[component]
-fn TransitionPage(title: &'static str, description: &'static str, bg_color: &'static str, accent: &'static str) -> Element {
+fn TransitionPage(
+    title: &'static str,
+    description: &'static str,
+    bg_color: &'static str,
+    accent: &'static str,
+    children: Element,
+) -> Element {
     rsx! {
         div { class: "min-h-screen pt-16 {bg_color}",
             div { class: "max-w-4xl mx-auto p-8",
                 div { class: "bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100",
                     h1 { class: "text-4xl font-bold mb-4 {accent}", "{title}" }
                     p { class: "text-gray-600 text-lg", "{description}" }
-                    div { class: "mt-8 grid grid-cols-3 gap-4",
-                        {
-                            (1..=3)
-                                .map(|i| {
-                                    rsx! {
-                                        div { class: "bg-white p-4 rounded-lg shadow border border-gray-100",
-                                            div { class: "w-full h-32 rounded-md {bg_color} mb-4" }
-                                            h3 { class: "font-medium mb-2", "Card {i}" }
-                                            p { class: "text-sm text-gray-500", "Sample content for card {i}" }
-                                        }
-                                    }
-                                })
-                        }
-                    }
+                    div { class: "mt-8", {children} }
                 }
             }
         }
@@ -327,10 +323,11 @@ fn TransitionPage(title: &'static str, description: &'static str, bg_color: &'st
 fn Home() -> Element {
     rsx! {
         TransitionPage {
-            title: "Welcome",
-            description: "Explore different transition animations between routes",
+            title: "Welcome to Page Transitions in Dioxus",
+            description: "Start exploring different transition animations",
             bg_color: "bg-gradient-to-br from-blue-50 to-indigo-100",
             accent: "text-blue-600",
+            NavLink { to: Route::SlideLeft {}, "Start with Slide Left →" }
         }
     }
 }
@@ -339,10 +336,11 @@ fn Home() -> Element {
 fn SlideLeft() -> Element {
     rsx! {
         TransitionPage {
-            title: "Slide Left",
-            description: "Smooth horizontal sliding transition from right to left",
+            title: "Slide Left Transition",
+            description: "Next, let's try sliding right",
             bg_color: "bg-gradient-to-br from-red-50 to-pink-100",
             accent: "text-red-600",
+            NavLink { to: Route::SlideRight {}, "Try Slide Right →" }
         }
     }
 }
@@ -351,10 +349,11 @@ fn SlideLeft() -> Element {
 fn SlideRight() -> Element {
     rsx! {
         TransitionPage {
-            title: "Slide Right",
-            description: "Elegant horizontal sliding transition from left to right",
+            title: "Slide Right Transition",
+            description: "Now, let's slide upwards",
             bg_color: "bg-gradient-to-br from-green-50 to-emerald-100",
-            accent: "text-emerald-600",
+            accent: "text-green-600",
+            NavLink { to: Route::SlideUp {}, "Try Slide Up ↑" }
         }
     }
 }
@@ -363,10 +362,11 @@ fn SlideRight() -> Element {
 fn SlideUp() -> Element {
     rsx! {
         TransitionPage {
-            title: "Slide Up",
-            description: "Vertical sliding transition moving upwards",
-            bg_color: "bg-gradient-to-br from-blue-50 to-cyan-100",
-            accent: "text-cyan-600",
+            title: "Slide Up Transition",
+            description: "Let's try sliding down",
+            bg_color: "bg-gradient-to-br from-purple-50 to-violet-100",
+            accent: "text-purple-600",
+            NavLink { to: Route::SlideDown {}, "Try Slide Down ↓" }
         }
     }
 }
@@ -375,10 +375,11 @@ fn SlideUp() -> Element {
 fn SlideDown() -> Element {
     rsx! {
         TransitionPage {
-            title: "Slide Down",
-            description: "Vertical sliding transition moving downwards",
-            bg_color: "bg-gradient-to-br from-orange-50 to-amber-100",
-            accent: "text-amber-600",
+            title: "Slide Down Transition",
+            description: "Finally, let's try fading",
+            bg_color: "bg-gradient-to-br from-yellow-50 to-amber-100",
+            accent: "text-yellow-600",
+            NavLink { to: Route::Fade {}, "Try Fade Effect" }
         }
     }
 }
@@ -387,22 +388,13 @@ fn SlideDown() -> Element {
 fn Fade() -> Element {
     rsx! {
         TransitionPage {
-            title: "Fade",
-            description: "Smooth opacity transition between routes",
-            bg_color: "bg-gradient-to-br from-purple-50 to-fuchsia-100",
-            accent: "text-fuchsia-600",
-        }
-    }
-}
-
-#[component]
-fn Scale() -> Element {
-    rsx! {
-        TransitionPage {
-            title: "Scale",
-            description: "Zoom transition with smooth scaling effect",
-            bg_color: "bg-gradient-to-br from-rose-50 to-red-100",
-            accent: "text-rose-600",
+            title: "Fade Transition",
+            description: "That's all the transitions! Start over?",
+            bg_color: "bg-gradient-to-br from-orange-50 to-rose-100",
+            accent: "text-orange-600",
+            div { class: "space-y-4",
+                NavLink { to: Route::Home {}, "← Back to Start" }
+            }
         }
     }
 }
