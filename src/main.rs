@@ -93,40 +93,20 @@ impl TransitionVariant {
 }
 
 #[component]
-fn FromRouteToCurrent(from: Element, upwards: bool) -> Element {
+fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
     let mut animated_router = use_animated_router::<Route>();
     let mut transform = use_motion(Transform::identity());
+    let mut opacity = use_motion(1.0f32);
 
     use_effect(move || {
-        if upwards {
-            transform.animate_to(
-                Transform::new(0.0, 0.0, 1.0, 0.0),
-                AnimationConfig::new(AnimationMode::Tween(
-                    Tween::new(Duration::from_millis(500)).with_easing(|t, b, c, d| {
-                        // Expo.Out easing
-                        if t == d {
-                            b + c
-                        } else {
-                            c * (-2f32.powf(-10.0 * t / d) + 1.0) + b
-                        }
-                    }),
-                )),
-            );
-        } else {
-            transform.animate_to(
-                Transform::new(0.0, 0.0, 1.0, 0.0),
-                AnimationConfig::new(AnimationMode::Tween(
-                    Tween::new(Duration::from_millis(500)).with_easing(|t, b, c, d| {
-                        // Expo.Out easing
-                        if t == d {
-                            b + c
-                        } else {
-                            c * (-2f32.powf(-10.0 * t / d) + 1.0) + b
-                        }
-                    }),
-                )),
-            );
-        }
+        transform.animate_to(
+            transition.get_transform(),
+            AnimationConfig::new(AnimationMode::Tween(Tween::new(Duration::from_millis(500)))),
+        );
+        opacity.animate_to(
+            0.0,
+            AnimationConfig::new(AnimationMode::Tween(Tween::new(Duration::from_millis(500)))),
+        );
     });
 
     use_effect(move || {
@@ -135,24 +115,16 @@ fn FromRouteToCurrent(from: Element, upwards: bool) -> Element {
         }
     });
 
-    let top = if upwards {
-        from.clone()
-    } else {
-        rsx!(Outlet::<Route> {})
-    };
-    let bottom = if upwards {
-        rsx!(Outlet::<Route> {})
-    } else {
-        from
-    };
-
     rsx! {
         div {
             class: "route-container",
             style: "height: 100%; width: 100%; position: relative;
-                   transform: translateY({transform.get_value().y}px);",
-            Expand { children: top }
-            Expand { children: bottom }
+                   transform: translate({transform.get_value().x}px, {transform.get_value().y}px) 
+                   scale({transform.get_value().scale});
+                   opacity: {opacity.get_value()};
+                   ",
+            {from}
+            Outlet::<Route> {}
         }
     }
 }
@@ -175,22 +147,18 @@ fn AnimatedOutlet(children: Element) -> Element {
 
     let from_route = match animated_router() {
         AnimatedRouterContext::FromTo(Route::Home {}, Route::Blog {}) => {
-            Some((rsx!(Home {}), true))
+            Some((rsx!(Home {}), TransitionVariant::SlideRight))
         }
-        AnimatedRouterContext::FromTo(Route::Blog {}, Route::Home {}) => Some((
-            rsx!(
-                Blog {}
-                {}
-            ),
-            false,
-        )),
-
+        AnimatedRouterContext::FromTo(Route::Blog {}, Route::Home {}) => {
+            Some((rsx!(Blog {}), TransitionVariant::SlideLeft))
+        }
         _ => None,
     };
+
     rsx! {
         div {
-            if let Some((from, upwards)) = from_route {
-                FromRouteToCurrent { upwards, from }
+            if let Some((from, transition)) = from_route {
+                FromRouteToCurrent { from, transition }
             } else {
                 Expand { Outlet::<Route> {} }
             }
