@@ -32,7 +32,6 @@ version = "0.1.0"
 dependencies = [
  "dioxus",
  "dioxus-motion",
- "router_derive",
 ]
 
 [[package]]
@@ -3486,15 +3485,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows-sys 0.48.0",
-]
-
-[[package]]
-name = "router_derive"
-version = "0.1.0"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.98",
 ]
 
 [[package]]

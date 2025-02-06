@@ -11,7 +11,7 @@ dioxus = { version = "0.6.0", features = ["router"] }
 dioxus-motion = { version = "0.2.3", default-features = false, features = [
     "web",
 ] }
-router_derive = { path = "./router_derive" }
+
 
 [features]
 default = ["desktop"]
@@ -32,4 +32,4 @@ inherits = "dev"
 inherits = "dev"
 
 [workspace]
-members = [".", "router_derive"]
+members = ["."]
