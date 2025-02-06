@@ -240,15 +240,24 @@ fn NavBar() -> Element {
 #[component]
 fn Home() -> Element {
     rsx! {
-        h1 { "Welcome to the Dioxus Blog!" }
+        div { style: "background-color: #f0f0f0; width: 100%; height: 100vh; padding: 2rem;",
+            div { style: "background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);",
+                h1 { "Welcome to the Dioxus Blog!" }
+                p { "This is a demonstration of smooth route transitions." }
+            }
+        }
     }
 }
 
 #[component]
 fn Blog() -> Element {
     rsx! {
-        h1 { "Blog" }
-        Outlet::<Route> {}
+        div { style: "background-color: #e0e0ff; width: 100%; height: 100vh; padding: 2rem;",
+            div { style: "background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);",
+                h1 { "Blog" }
+                p { "Welcome to our blog section!" }
+            }
+        }
     }
 }
 
