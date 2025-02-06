@@ -1,0 +1,24 @@
+[application]
+
+# App (Project) Name
+name = "animated_router"
+
+[web.app]
+
+# HTML title tag content
+title = "animated_router"
+
+# include `assets` in web platform
+[web.resource]
+
+# Additional CSS style files
+style = []
+
+# Additional JavaScript files
+script = []
+
+[web.resource.dev]
+
+# Javascript code file
+# serve: [dev-server] only
+script = []
