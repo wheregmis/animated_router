@@ -91,26 +91,46 @@ impl TransitionVariant {
         }
     }
 }
-
 #[component]
 fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
     let mut animated_router = use_animated_router::<Route>();
-    let mut transform = use_motion(Transform::identity());
+    let mut transform = use_motion(Transform::new(0.0, 0.0, 1.0, 1.0));
     let mut opacity = use_motion(1.0f32);
 
+    // Initial transform setup
     use_effect(move || {
-        transform.animate_to(
-            transition.get_transform(),
-            AnimationConfig::new(AnimationMode::Tween(Tween::new(Duration::from_millis(500)))),
-        );
-        opacity.animate_to(
-            0.0,
-            AnimationConfig::new(AnimationMode::Tween(Tween::new(Duration::from_millis(500)))),
-        );
+        // First set initial position
+        transform.reset();
+        opacity.reset();
+
+        // Then animate to final position
+        let target_transform = match transition {
+            TransitionVariant::SlideLeft => Transform::new(-100.0, 0.0, 1.0, 0.0),
+            TransitionVariant::SlideRight => Transform::new(100.0, 0.0, 1.0, 0.0),
+            TransitionVariant::SlideUp => Transform::new(0.0, -100.0, 1.0, 0.0),
+            TransitionVariant::SlideDown => Transform::new(0.0, 100.0, 1.0, 0.0),
+            _ => transition.get_transform(),
+        };
+
+        let config = AnimationConfig::new(AnimationMode::Tween(
+            Tween::new(Duration::from_millis(500)).with_easing(|t, b, c, d| {
+                // Cubic ease-in-out
+                let t = t / (d / 2.0);
+                if t < 1.0 {
+                    c / 2.0 * t * t * t + b
+                } else {
+                    let t = t - 2.0;
+                    c / 2.0 * (t * t * t + 2.0) + b
+                }
+            }),
+        ));
+
+        transform.animate_to(target_transform, config.clone());
+        opacity.animate_to(0.0, config);
     });
 
     use_effect(move || {
-        if !transform.is_running() {
+        if !transform.is_running() && !opacity.is_running() {
             animated_router.write().settle();
         }
     });
@@ -118,8 +138,8 @@ fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
     rsx! {
         div {
             class: "route-container",
-            style: "height: 100%; width: 100%; position: relative;
-                   transform: translate({transform.get_value().x}px, {transform.get_value().y}px) 
+            style: "
+                   transform: translate({transform.get_value().x}%, {transform.get_value().y}%) 
                    scale({transform.get_value().scale});
                    opacity: {opacity.get_value()};
                    ",
@@ -130,27 +150,15 @@ fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
 }
 
 #[component]
-fn Expand(children: Element) -> Element {
-    rsx! {
-        div {
-            class: "expand",
-            style: "height: 100%; width: 100%;
-                   display: flex; align-items: center; justify-content: center;",
-            {children}
-        }
-    }
-}
-
-#[component]
 fn AnimatedOutlet(children: Element) -> Element {
     let animated_router = use_context::<Signal<AnimatedRouterContext<Route>>>();
 
     let from_route = match animated_router() {
         AnimatedRouterContext::FromTo(Route::Home {}, Route::Blog {}) => {
-            Some((rsx!(Home {}), TransitionVariant::SlideRight))
+            Some((rsx!(Home {}), TransitionVariant::SlideUp))
         }
         AnimatedRouterContext::FromTo(Route::Blog {}, Route::Home {}) => {
-            Some((rsx!(Blog {}), TransitionVariant::SlideLeft))
+            Some((rsx!(Blog {}), TransitionVariant::SlideDown))
         }
         _ => None,
     };
@@ -160,7 +168,7 @@ fn AnimatedOutlet(children: Element) -> Element {
             if let Some((from, transition)) = from_route {
                 FromRouteToCurrent { from, transition }
             } else {
-                Expand { Outlet::<Route> {} }
+                Outlet::<Route> {}
             }
         }
     }
@@ -208,7 +216,7 @@ fn NavBar() -> Element {
 #[component]
 fn Home() -> Element {
     rsx! {
-        div { style: "background-color: #f0f0f0; width: 100%; height: 100vh; padding: 2rem;",
+        div { style: "background-color: #f0f0f0; width: 100%; height: 80vh; padding: 2rem;",
             div { style: "background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);",
                 h1 { "Welcome to the Dioxus Blog!" }
                 p { "This is a demonstration of smooth route transitions." }
@@ -220,7 +228,7 @@ fn Home() -> Element {
 #[component]
 fn Blog() -> Element {
     rsx! {
-        div { style: "background-color: #e0e0ff; width: 100%; height: 100vh; padding: 2rem;",
+        div { style: "background-color: #e0e0ff; width: 100%; height: 80vh; padding: 2rem;",
             div { style: "background-color: white; padding: 2rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);",
                 h1 { "Blog" }
                 p { "Welcome to our blog section!" }
