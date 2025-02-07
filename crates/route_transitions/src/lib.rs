@@ -30,19 +30,22 @@ pub fn derive_route_transitions(input: TokenStream) -> TokenStream {
             .map(|t| format_ident!("{}", t))
             .unwrap_or(format_ident!("Fade"));
 
-        let pattern = match &variant.fields {
-            Fields::Named(named_fields) => {
-                let field_patterns = named_fields.named.iter().map(|f| {
-                    let field_name = &f.ident;
-                    quote! { #field_name }
+        match &variant.fields {
+            Fields::Named(fields) => {
+                let field_patterns = fields.named.iter().map(|f| {
+                    let name = &f.ident;
+                    quote! { #name: _ }
                 });
-                quote! { Self::#variant_ident { #(#field_patterns,)* } }
+                quote! {
+                    Self::#variant_ident { #(#field_patterns,)* } => TransitionVariant::#transition
+                }
             }
-            Fields::Unnamed(_) => quote! { Self::#variant_ident(..) },
-            Fields::Unit => quote! { Self::#variant_ident },
-        };
-        quote! {
-            #pattern => TransitionVariant::#transition
+            Fields::Unnamed(_) => {
+                quote! { Self::#variant_ident(..) => TransitionVariant::#transition }
+            }
+            Fields::Unit => {
+                quote! { Self::#variant_ident {} => TransitionVariant::#transition }
+            }
         }
     });
 
@@ -51,21 +54,19 @@ pub fn derive_route_transitions(input: TokenStream) -> TokenStream {
         let component_name = &variant.ident;
 
         match &variant.fields {
-            Fields::Named(_) => {
-                // For any variant with named fields, just return Home component
+            Fields::Named(fields) => {
+                let field_names: Vec<_> = fields.named.iter().map(|f| &f.ident).collect();
                 quote! {
-                    Self::#variant_ident { .. } => Home()
+                    Self::#variant_ident { #(ref #field_names,)* } => {
+                        rsx! { #component_name { #(#field_names: #field_names.clone(),)* } }
+                    }
                 }
             }
             Fields::Unnamed(_) => {
-                quote! {
-                    Self::#variant_ident(..) => #component_name()
-                }
+                quote! { Self::#variant_ident(..) => rsx! { #component_name {} } }
             }
             Fields::Unit => {
-                quote! {
-                    Self::#variant_ident => #component_name()
-                }
+                quote! { Self::#variant_ident {} => rsx! { #component_name {} } }
             }
         }
     });
@@ -75,10 +76,11 @@ pub fn derive_route_transitions(input: TokenStream) -> TokenStream {
             pub fn get_transition(&self) -> TransitionVariant {
                 match self {
                     #(#transition_match_arms,)*
+                    _ => TransitionVariant::Fade,
                 }
             }
 
-            pub fn get_component(&self) -> Result<VNode, RenderError> {
+            pub fn get_component(&self) -> Element {
                 match self {
                     #(#component_match_arms,)*
                 }
