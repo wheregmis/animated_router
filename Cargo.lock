@@ -32,6 +32,7 @@ version = "0.1.0"
 dependencies = [
  "dioxus",
  "dioxus-motion",
+ "route_transitions",
 ]
 
 [[package]]
@@ -1122,8 +1123,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "instant",
- "wasm-bindgen",
- "web-sys",
+ "tokio",
 ]
 
 [[package]]
@@ -2303,9 +2303,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e0242819d153cba4b4b05a5a8f2a7e9bbf97b6055b2a002b395c96b5ff3c0222"
 dependencies = [
  "cfg-if",
- "js-sys",
- "wasm-bindgen",
- "web-sys",
 ]
 
 [[package]]
@@ -3485,6 +3482,15 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows-sys 0.48.0",
+]
+
+[[package]]
+name = "route_transitions"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
 ]
 
 [[package]]
