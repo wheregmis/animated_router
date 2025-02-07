@@ -12,7 +12,7 @@ enum Route {
         #[transition(Fade)]
         Home {},
         #[route("/slide-left")]
-        #[transition(SlideLeft)]
+        #[transition(ZoomIn)]
         SlideLeft {},
         #[route("/slide-right")]
         #[transition(SlideRight)]
@@ -29,6 +29,13 @@ enum Route {
     #[end_layout]
     #[route("/:..route")]
     PageNotFound { route: Vec<String> },
+}
+
+#[component]
+pub fn AnimationBuilder() -> Element {
+    rsx! {
+        AnimatedRouter::<Route> {}
+    }
 }
 
 #[component]

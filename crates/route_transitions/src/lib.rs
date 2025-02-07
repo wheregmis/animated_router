@@ -72,20 +72,22 @@ pub fn derive_route_transitions(input: TokenStream) -> TokenStream {
     });
 
     let expanded = quote! {
-        impl #name {
-            pub fn get_transition(&self) -> TransitionVariant {
+        impl AnimatableRoute for  #name {
+            fn get_transition(&self) -> TransitionVariant {
                 match self {
                     #(#transition_match_arms,)*
                     _ => TransitionVariant::Fade,
                 }
             }
 
-            pub fn get_component(&self) -> Element {
+            fn get_component(&self) -> Element {
                 match self {
                     #(#component_match_arms,)*
                 }
             }
         }
+
+
     };
 
     TokenStream::from(expanded)

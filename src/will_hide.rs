@@ -43,17 +43,13 @@ impl<R: Routable + PartialEq> AnimatedRouterContext<R> {
 }
 
 #[derive(Props, Clone, PartialEq)]
-pub struct AnimatedRouterProps {
-    children: Element,
-}
+pub struct AnimatedRouterProps {}
 
 /// Provide a mechanism for outlets to animate between route transitions.
 ///
 /// See the `animated_sidebar.rs` or `animated_tabs.rs` for an example on how to use it.
 #[allow(non_snake_case)]
-pub fn AnimatedRouter<R: Routable + PartialEq + Clone>(
-    AnimatedRouterProps { children }: AnimatedRouterProps,
-) -> Element {
+pub fn AnimatedRouter<R: AnimatableRoute>(AnimatedRouterProps {}: AnimatedRouterProps) -> Element {
     let route = use_route::<R>();
     let mut prev_route = use_signal(|| AnimatedRouterContext::In(route.clone()));
     use_context_provider(move || prev_route);
@@ -62,7 +58,33 @@ pub fn AnimatedRouter<R: Routable + PartialEq + Clone>(
         prev_route.write().set_target_route(route);
     }
 
-    rsx!({ children })
+    rsx!(AnimatedOutlet::<R> {})
+}
+
+pub trait AnimatableRoute: Routable + Clone + PartialEq {
+    fn get_transition(&self) -> TransitionVariant;
+    fn get_component(&self) -> Element;
+}
+
+#[allow(non_snake_case)]
+pub fn AnimatedOutlet<R: AnimatableRoute>() -> Element {
+    let animated_router = use_context::<Signal<AnimatedRouterContext<R>>>();
+    let from_route: Option<(Element, TransitionVariant)> = match animated_router() {
+        AnimatedRouterContext::FromTo(from, to) => {
+            Some((from.get_component(), to.get_transition()))
+        }
+        _ => None,
+    };
+
+    rsx! {
+        div {
+            if let Some((from, transition)) = from_route {
+                FromRouteToCurrent { from, transition }
+            } else {
+                Outlet::<R> {}
+            }
+        }
+    }
 }
 
 /// Shortcut to get access to the [AnimatedRouterContext].
@@ -85,6 +107,59 @@ pub enum TransitionVariant {
     SlideUp,
     SlideDown,
     Fade,
+    // Scale transitions
+    ScaleUp,
+    ScaleDown,
+    // Flip transitions
+    FlipHorizontal,
+    FlipVertical,
+    // Rotate transitions
+    RotateLeft,
+    RotateRight,
+    // Combinations
+    SlideUpFade,
+    SlideDownFade,
+    ScaleUpFade,
+    // Bounce effects
+    BounceIn,
+    BounceOut,
+
+    // Additional combined transitions
+    ScaleDownFade,
+    RotateLeftFade,
+    RotateRightFade,
+    FlipHorizontalFade,
+    FlipVerticalFade,
+
+    // Zoom transitions
+    ZoomIn,
+    ZoomOut,
+
+    // Diagonal slides
+    SlideDiagonalUpLeft,
+    SlideDiagonalUpRight,
+    SlideDiagonalDownLeft,
+    SlideDiagonalDownRight,
+
+    // Spiral transitions
+    SpiralIn,
+    SpiralOut,
+
+    // Elastic transitions
+    ElasticIn,
+    ElasticOut,
+
+    // Swing transitions
+    SwingIn,
+    SwingOut,
+
+    SlideLeftFade,
+    SlideRightFade,
+
+    ScaleRotateFade,
+    SlideFadeRotate,
+    ScaleFadeFlip,
+    RotateScaleSlide,
 }
 
 impl TransitionVariant {
@@ -118,6 +193,211 @@ impl TransitionVariant {
                 initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
                 final_from: Transform::new(0.0, 0.0, 1.0, 0.0),
                 initial_to: Transform::new(0.0, 0.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            // Combined Transitions
+            TransitionVariant::SlideUpFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, -50.0, 1.0, 0.0),
+                initial_to: Transform::new(0.0, 50.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideDownFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 50.0, 1.0, 0.0),
+                initial_to: Transform::new(0.0, -50.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideLeftFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(-50.0, 0.0, 1.0, 0.0),
+                initial_to: Transform::new(50.0, 0.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideRightFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(50.0, 0.0, 1.0, 0.0),
+                initial_to: Transform::new(-50.0, 0.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ScaleUpFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.2, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 0.8, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ScaleDownFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 0.8, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 1.2, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::RotateLeftFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.0, -45.0),
+                initial_to: Transform::new(0.0, 0.0, 1.0, 45.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::RotateRightFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.0, 45.0),
+                initial_to: Transform::new(0.0, 0.0, 1.0, -45.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::FlipHorizontalFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, -1.0, 0.0),
+                initial_to: Transform::new(0.0, 0.0, -1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::FlipVerticalFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 180.0, 1.0, 0.0),
+                initial_to: Transform::new(0.0, -180.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ScaleRotateFade => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.5, -45.0),
+                initial_to: Transform::new(0.0, 0.0, 0.5, 45.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideFadeRotate => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(-50.0, -50.0, 1.0, -45.0),
+                initial_to: Transform::new(50.0, 50.0, 1.0, 45.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ScaleFadeFlip => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 180.0, 1.5, 0.0),
+                initial_to: Transform::new(0.0, -180.0, 0.5, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::RotateScaleSlide => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(-50.0, 0.0, 1.5, -90.0),
+                initial_to: Transform::new(50.0, 0.0, 0.5, 90.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ScaleUp => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.5, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 0.5, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ScaleDown => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 0.5, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 1.5, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::FlipHorizontal => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, -1.0, 0.0),
+                initial_to: Transform::new(0.0, 0.0, -1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::FlipVertical => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 180.0, 1.0, 0.0),
+                initial_to: Transform::new(0.0, -180.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::RotateLeft => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.0, -90.0),
+                initial_to: Transform::new(0.0, 0.0, 1.0, 90.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::RotateRight => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.0, 90.0),
+                initial_to: Transform::new(0.0, 0.0, 1.0, -90.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::BounceIn => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 50.0, 0.3, 0.0),
+                initial_to: Transform::new(0.0, -50.0, 1.3, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::BounceOut => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, -50.0, 1.3, 0.0),
+                initial_to: Transform::new(0.0, 50.0, 0.3, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ZoomIn => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 2.0, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 0.1, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ZoomOut => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 0.1, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 2.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideDiagonalUpLeft => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(-100.0, -100.0, 1.0, 0.0),
+                initial_to: Transform::new(100.0, 100.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideDiagonalUpRight => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(100.0, -100.0, 1.0, 0.0),
+                initial_to: Transform::new(-100.0, 100.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideDiagonalDownLeft => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(-100.0, 100.0, 1.0, 0.0),
+                initial_to: Transform::new(100.0, -100.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SlideDiagonalDownRight => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(100.0, 100.0, 1.0, 0.0),
+                initial_to: Transform::new(-100.0, -100.0, 1.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SpiralIn => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 0.0, -720.0),
+                initial_to: Transform::new(0.0, 0.0, 2.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SpiralOut => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 2.0, 720.0),
+                initial_to: Transform::new(0.0, 0.0, 0.0, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ElasticIn => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 0.3, 0.0),
+                initial_to: Transform::new(0.0, 30.0, 1.5, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::ElasticOut => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 30.0, 1.5, 0.0),
+                initial_to: Transform::new(0.0, 0.0, 0.3, 0.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SwingIn => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.0, -20.0),
+                initial_to: Transform::new(0.0, 0.0, 1.0, 20.0),
+                final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
+            },
+            TransitionVariant::SwingOut => TransitionConfig {
+                initial_from: Transform::new(0.0, 0.0, 1.0, 1.0),
+                final_from: Transform::new(0.0, 0.0, 1.0, 20.0),
+                initial_to: Transform::new(0.0, 0.0, 1.0, -20.0),
                 final_to: Transform::new(0.0, 0.0, 1.0, 1.0),
             },
         }
@@ -210,34 +490,5 @@ fn FromRouteToCurrent(from: Element, transition: TransitionVariant) -> Element {
                 Outlet::<Route> {}
             }
         }
-    }
-}
-
-#[component]
-pub fn AnimatedOutlet(children: Element) -> Element {
-    let animated_router = use_context::<Signal<AnimatedRouterContext<Route>>>();
-    let from_route: Option<(Result<VNode, RenderError>, TransitionVariant)> =
-        match animated_router() {
-            AnimatedRouterContext::FromTo(from, to) => {
-                Some((from.get_component(), to.get_transition()))
-            }
-            _ => None,
-        };
-
-    rsx! {
-        div {
-            if let Some((from, transition)) = from_route {
-                FromRouteToCurrent { from, transition }
-            } else {
-                Outlet::<Route> {}
-            }
-        }
-    }
-}
-
-#[component]
-pub fn AnimationBuilder() -> Element {
-    rsx! {
-        AnimatedRouter::<Route> { AnimatedOutlet {} }
     }
 }
