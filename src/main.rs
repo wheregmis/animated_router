@@ -1,10 +1,10 @@
 use dioxus::prelude::*;
-use route_transitions::RouteTransitions;
+use route_transitions::MotionTransitions;
 
 pub mod will_hide;
 pub use will_hide::*;
 
-#[derive(Routable, Clone, Debug, PartialEq, RouteTransitions)]
+#[derive(Routable, Clone, Debug, PartialEq, MotionTransitions)]
 #[rustfmt::skip]
 enum Route {
     #[layout(AnimationBuilder)]

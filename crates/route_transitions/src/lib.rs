@@ -15,13 +15,13 @@ fn get_transition_from_attrs(attrs: &[Attribute]) -> Option<String> {
         })
 }
 
-#[proc_macro_derive(RouteTransitions, attributes(transition))]
+#[proc_macro_derive(MotionTransitions, attributes(transition))]
 pub fn derive_route_transitions(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
     let variants = match input.data {
         Data::Enum(DataEnum { variants, .. }) => variants,
-        _ => panic!("RouteTransitions can only be derived for enums"),
+        _ => panic!("MotionTransitions can only be derived for enums"),
     };
 
     let transition_match_arms = variants.iter().map(|variant| {
