@@ -1,13 +1,14 @@
 use dioxus::prelude::*;
 use route_transitions::MotionTransitions;
 
+// Will be replaced with Library
 pub mod will_hide;
 pub use will_hide::*;
 
-#[derive(Routable, Clone, Debug, PartialEq, MotionTransitions)]
+#[derive(Routable, Clone, Debug, PartialEq, MotionTransitions )]
 #[rustfmt::skip]
 enum Route {
-    #[layout(AnimationBuilder)]
+    #[layout(MotionTransitionBuilder)]
         #[route("/")]
         #[transition(Fade)]
         Home {},
@@ -15,24 +16,21 @@ enum Route {
         #[transition(ZoomIn)]
         SlideLeft {},
         #[route("/slide-right")]
-        #[transition(SlideRight)]
         SlideRight {},
         #[route("/slide-up")]
-        #[transition(SlideUp)]
         SlideUp {},
         #[route("/slide-down")]
-        #[transition(SlideDown)]
         SlideDown {},
         #[route("/fade")]
-        #[transition(Fade)]
         Fade {},
     #[end_layout]
     #[route("/:..route")]
     PageNotFound { route: Vec<String> },
 }
 
+// AnimatedRouter::<Route> {}
 #[component]
-pub fn AnimationBuilder() -> Element {
+pub fn MotionTransitionBuilder() -> Element {
     rsx! {
         AnimatedRouter::<Route> {}
     }
