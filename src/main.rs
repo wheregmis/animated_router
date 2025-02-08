@@ -1,153 +1,132 @@
+//! An advanced usage of the router with nested routes and redirects.
+//!
+//! Dioxus implements an enum-based router, which allows you to define your routes in a type-safe way.
+//! However, since we need to bake quite a bit of logic into the enum, we have to add some extra syntax.
+//!
+//! Note that you don't need to use advanced features like nest, redirect, etc, since these can all be implemented
+//! manually, but they are provided as a convenience.
+
 use dioxus::prelude::*;
-use route_transitions::MotionTransitions;
+use dioxus_motion::prelude::*;
 
-// Will be replaced with Library
-pub mod will_hide;
-pub use will_hide::*;
+const STYLE: Asset = asset!("/assets/router.css");
 
-#[derive(Routable, Clone, Debug, PartialEq, MotionTransitions )]
+fn main() {
+    dioxus::launch(|| {
+        rsx! {
+            document::Link { rel: "stylesheet", href: STYLE }
+            Router::<Route> {}
+        }
+    });
+}
+
+// Turn off rustfmt since we're doing layouts and routes in the same enum
+#[derive(Routable, Clone, Debug, PartialEq, MotionTransitions)]
 #[rustfmt::skip]
+#[allow(clippy::empty_line_after_outer_attr)]
 enum Route {
-    #[layout(MotionTransitionBuilder)]
+    // Wrap Home in a Navbar Layout
+    #[layout(NavBar)]
+        // The default route is always "/" unless otherwise specified
         #[route("/")]
-        #[transition(Fade)]
+        #[transition(SlideDown)]
         Home {},
-        #[route("/slide-left")]
-        #[transition(ZoomIn)]
-        SlideLeft {},
-        #[route("/slide-right")]
-        SlideRight {},
-        #[route("/slide-up")]
-        SlideUp {},
-        #[route("/slide-down")]
-        SlideDown {},
-        #[route("/fade")]
-        Fade {},
+
+        // Wrap the next routes in a layout and a nest
+        #[nest("/blog")]
+        #[layout(Blog)]
+            // At "/blog", we want to show a list of blog posts
+            #[route("/")]
+            #[transition(SlideUp)]
+            BlogList {},
+
+            // At "/blog/:name", we want to show a specific blog post, using the name slug
+            #[route("/:name")]
+            #[transition(SlideRight)]
+            BlogPost { name: String },
+
+        // We need to end the blog layout and nest
+        // Note we don't need either - we could've just done `/blog/` and `/blog/:name` without nesting,
+        // but it's a bit cleaner this way
+        #[end_layout]
+        #[end_nest]
+
+    // And the regular page layout
     #[end_layout]
+
+    // Add some redirects for the `/myblog` route
+    #[nest("/myblog")]
+        #[redirect("/", || Route::BlogList {})]
+        #[redirect("/:name", |name: String| Route::BlogPost { name })]
+    #[end_nest]
+
+    // Finally, we need to handle the 404 page
     #[route("/:..route")]
-    PageNotFound { route: Vec<String> },
-}
-
-// AnimatedRouter::<Route> {}
-#[component]
-pub fn MotionTransitionBuilder() -> Element {
-    rsx! {
-        AnimatedRouter::<Route> {}
-    }
+    PageNotFound {
+        route: Vec<String>,
+    },
 }
 
 #[component]
-fn NavLink(to: Route, children: Element) -> Element {
-    let current_route = use_route::<Route>();
-    let is_active = current_route == to;
-
+fn NavBar() -> Element {
     rsx! {
-        Link {
-            to,
-            class: if is_active { "px-3 py-1 rounded-full text-sm transition-colors duration-200 bg-indigo-100 text-indigo-700" } else { "px-3 py-1 rounded-full text-sm transition-colors duration-200 text-gray-600 hover:text-gray-900 hover:bg-gray-100" },
-            {children}
+        nav { id: "navbar take it",
+            Link { to: Route::Home {}, "Home" }
+            Link { to: Route::BlogList {}, "Blog" }
         }
-    }
-}
-
-#[component]
-fn TransitionPage(
-    title: &'static str,
-    description: &'static str,
-    bg_color: &'static str,
-    accent: &'static str,
-    children: Element,
-) -> Element {
-    rsx! {
-        div { class: "min-h-screen pt-16 {bg_color}",
-            div { class: "max-w-4xl mx-auto p-8",
-                div { class: "bg-white/80 backdrop-blur-md rounded-2xl shadow-xl p-8 border border-gray-100",
-                    h1 { class: "text-4xl font-bold mb-4 {accent}", "{title}" }
-                    p { class: "text-gray-600 text-lg", "{description}" }
-                    div { class: "mt-8", {children} }
-                }
-            }
-        }
+        AnimatedOutlet::<Route> {}
     }
 }
 
 #[component]
 fn Home() -> Element {
     rsx! {
-        TransitionPage {
-            title: "Welcome to Page Transitions in Dioxus",
-            description: "Start exploring different transition animations",
-            bg_color: "bg-gradient-to-br from-blue-50 to-indigo-100",
-            accent: "text-blue-600",
-            NavLink { to: Route::SlideLeft {}, "Start with Slide Left →" }
-        }
+        h1 { "Welcome to the Dioxus Blog!" }
     }
 }
 
 #[component]
-fn SlideLeft() -> Element {
+fn Blog() -> Element {
     rsx! {
-        TransitionPage {
-            title: "Slide Left Transition",
-            description: "Next, let's try sliding right",
-            bg_color: "bg-gradient-to-br from-red-50 to-pink-100",
-            accent: "text-red-600",
-            NavLink { to: Route::SlideRight {}, "Try Slide Right →" }
-        }
+        h1 { "Blog" }
+        AnimatedOutlet::<Route> {}
     }
 }
 
 #[component]
-fn SlideRight() -> Element {
+fn BlogList() -> Element {
     rsx! {
-        TransitionPage {
-            title: "Slide Right Transition",
-            description: "Now, let's slide upwards",
-            bg_color: "bg-gradient-to-br from-green-50 to-emerald-100",
-            accent: "text-green-600",
-            NavLink { to: Route::SlideUp {}, "Try Slide Up ↑" }
-        }
-    }
-}
-
-#[component]
-fn SlideUp() -> Element {
-    rsx! {
-        TransitionPage {
-            title: "Slide Up Transition",
-            description: "Let's try sliding down",
-            bg_color: "bg-gradient-to-br from-purple-50 to-violet-100",
-            accent: "text-purple-600",
-            NavLink { to: Route::SlideDown {}, "Try Slide Down ↓" }
-        }
-    }
-}
-
-#[component]
-fn SlideDown() -> Element {
-    rsx! {
-        TransitionPage {
-            title: "Slide Down Transition",
-            description: "Finally, let's try fading",
-            bg_color: "bg-gradient-to-br from-yellow-50 to-amber-100",
-            accent: "text-yellow-600",
-            NavLink { to: Route::Fade {}, "Try Fade Effect" }
-        }
-    }
-}
-
-#[component]
-fn Fade() -> Element {
-    rsx! {
-        TransitionPage {
-            title: "Fade Transition",
-            description: "That's all the transitions! Start over?",
-            bg_color: "bg-gradient-to-br from-orange-50 to-rose-100",
-            accent: "text-orange-600",
-            div { class: "space-y-4",
-                NavLink { to: Route::Home {}, "← Back to Start" }
+        h2 { "Choose a post" }
+        div { id: "blog-list",
+            Link {
+                to: Route::BlogPost {
+                    name: "Blog post 1".into(),
+                },
+                "Read the first blog post"
+            }
+            Link {
+                to: Route::BlogPost {
+                    name: "Blog post 2".into(),
+                },
+                "Read the second blog post"
             }
         }
+    }
+}
+
+// We can use the `name` slug to show a specific blog post
+// In theory we could read from the filesystem or a database here
+#[component]
+fn BlogPost(name: String) -> Element {
+    let contents = match name.as_str() {
+        "Blog post 1" => "This is the first blog post. It's not very interesting.",
+        "Blog post 2" => "This is the second blog post. It's not very interesting either.",
+        _ => "This blog post doesn't exist.",
+    };
+
+    rsx! {
+        h2 { "{name}" }
+        p { "{contents}" }
     }
 }
 
@@ -158,14 +137,4 @@ fn PageNotFound(route: Vec<String>) -> Element {
         p { "We are terribly sorry, but the page you requested doesn't exist." }
         pre { color: "red", "log:\nattemped to navigate to: {route:?}" }
     }
-}
-
-const MAIN_CSS: Asset = asset!("/assets/main.css");
-fn main() {
-    dioxus::launch(|| {
-        rsx! {
-            document::Link { rel: "stylesheet", href: MAIN_CSS }
-            Router::<Route> {}
-        }
-    });
 }
